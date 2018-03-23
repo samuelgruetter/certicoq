@@ -84,7 +84,20 @@ Definition compile_template_L7 (p : program) : exception (L5_to_L6.nEnv * Clight
   compile_opt_L7 (translateTo (cTerm certiL6) p).
 
 Open Scope positive_scope.
-  
+
+
+
+
+
+Definition compile_to_L2 (p:program) := (translateTo (cTerm certiL2)) p.
+Definition compile_L2_to_L2d := certiL1g_to_L2.
+Definition compile_L2d_to_L2k := certiL2_to_L2k.
+Definition compile_L2k_to_L25 := certiL2_to_L2_5.
+Definition compile_L25_to_L3 := certiL2_to_L3. (* this is actually L2_5 to L3 *)
+Definition compile_to_L3 (p:program) := @composeTranslation _ _ (translateTo (cTerm certiL2_5)) _ (certiL2_to_L3) p. 
+Definition compile_L3_to_L4  := @composeTranslation _ _ (certiL3_to_L3_eta) _ (certiL3_eta_to_L4).
+Definition compile_L4_to_L5 e := certiL4_5_to_L5 (certiL4_2_to_L4_5 (certiL4_to_L4_2 e)).
+Definition compile_L5_to_L6  :=  certiL5_t0_L6.
 
 
 
@@ -126,6 +139,124 @@ Require Import Benchmarks.Binom
 (*  Quote Recursively Definition vs := vs.main_h.  (*ce_example_ent*) *)
 (* Quote Recursively Definition binom := Binom.main.    *)
 (* Quote Recursively Definition graph_color := Color.ex_2.  (*(Color.run G16)*)    *)
+
+Fixpoint fib x :=
+  (match x with
+  | 0 => 1
+  | S n =>
+    match n with
+    | 0 => 1
+    | (S n') => (fib n) + (fib n')
+    end
+  end)%nat.
+
+
+Locate Ehalt.
+
+Open Scope positive.
+Local Definition fib_n := 2.
+Local Definition n_n := 3.
+Local Definition k_n := 4.
+Local Definition n'_n := 5.
+Local Definition res1_n := 6.
+Local Definition res2_n := 7.
+Local Definition n''_n := 8.
+
+
+Local Definition kon_tag := 2.
+Local Definition fun_tag := 3.
+
+Definition O_Ctag := 1.
+Definition S_Ctag := 2.
+
+Local Definition temp_n := 1.
+
+Definition two6: (var -> exp) -> exp :=
+ fun k => 
+  Econstr temp_n O_Ctag nil
+          (Econstr temp_n S_Ctag (temp_n::nil)
+                   (Econstr temp_n S_Ctag (temp_n::nil)
+                            (k temp_n))).
+
+
+Definition fib6:(var -> exp) :=
+  fun arg_n =>
+  (Efun
+     (Fcons fib_n fun_tag (n_n::k_n::nil)
+            (Ecase n_n
+                   (
+                     (O_Ctag, Econstr temp_n O_Ctag nil (Eapp k_n kon_tag (temp_n::nil)))::
+                                                                       (S_Ctag, Eproj n'_n S_Ctag (0%N) n_n (Ecase n'_n
+                                                                                                                   ((O_Ctag,
+                                                                                                                     Econstr temp_n O_Ctag nil
+                                                                                                                             (Econstr temp_n S_Ctag (temp_n::nil)
+                                                                                                                                      (Eapp k_n kon_tag (temp_n::nil))))::
+                                                                                                                    (S_Ctag, Eapp k_n kon_tag (n_n::nil) (* fake instead of rec call *) )::nil)))
+                                                                                      ::nil))
+                   
+            (Fcons k_n kon_tag (temp_n::nil)
+               (Ehalt temp_n)
+               Fnil))
+     (Eapp fib_n fun_tag (arg_n::k_n::nil))).
+
+Print L6.eval.env.
+Print L6.cps.val.
+Print L6.cps.cEnv.
+
+Print cTyInfo.
+
+Definition cenv_nat :=
+
+  L6.cps.M.set O_Ctag (nNamed "O", 1, 0%N, 0%N) (L6.cps.M.set S_Ctag (nNamed "S", 1, 1%N, 1%N) (L6.cps.M.empty _)).
+
+Eval vm_compute in (CertiCoq.L6.eval.bstep_f (L6.cps.M.empty _) (cenv_nat) (L6.cps.M.empty L6.cps.val) (two6 fib6) 30%nat).
+
+About compile.
+Definition next_iTag := 100.
+Definition next_cTag := 100.
+Definition bogus_cloTag := 100.
+Definition fib6_hoist :=
+  closure_conversion.closure_conversion_hoist
+    bogus_cloTag
+    (two6 fib6)
+    next_cTag
+    next_iTag
+    cenv_nat (L6.cps.M.empty _).
+
+Set Printing Depth 1000.
+Locate run.
+Definition ofib7 := Eval cbv in (compile argsIdent allocIdent limitIdent gcIdent mainIdent bodyIdent threadInfIdent tinfIdent heapInfIdent numArgsIdent isptrIdent caseIdent (snd fib6_hoist) (fst (fst fib6_hoist)) (snd (fst fib6_hoist))).
+
+
+
+Definition fib7 :=  (match ofib7 with
+                         | (nenv, Some fib7) => 
+                           Ret (nenv, fib7)
+                         | (nenv, None) => 
+                           Exc "None"
+                         end).
+
+ Require Import ExtrOcamlBasic.
+Require Import ExtrOcamlString.
+Require Import ExtrOcamlNatInt.
+
+
+
+
+Quote Recursively Definition fib_q := fib.
+Print fib_q.
+
+
+Print fib_q.
+Definition fib3 := Eval vm_compute in (translateTo (cTerm certiL3) fib_q).
+
+Definition fib5 := Eval vm_compute in (translateTo (cTerm certiL5) fib_q).
+
+
+Set Printing Depth 1000.
+
+
+
 Quote Recursively Definition graph_color := 2.  (*(Color.run G16)*)   
 
 
@@ -136,7 +267,7 @@ Quote Recursively Definition graph_color := 2.  (*(Color.run G16)*)
 
 
 (* Definition binom5 := Eval native_compute in (translateTo (cTerm certiL5a) binom). *)
-Definition color5 := Eval native_compute in (translateTo (cTerm certiL5a) graph_color).   
+ Definition color5 := Eval vm_compute in (translateTo (cTerm certiL5) graph_color).    
 (* Definition vs5 := Eval native_compute in (translateTo (cTerm certiL5a) vs).  *)
 
 
@@ -178,22 +309,25 @@ Definition print_BigStepResult_L6 p  n:=
  Definition comp_L6 p := match p
                           with
                             | Exc s => Exc s
-                            | Ret v =>  Ret (L6.instances.certiL5a_t0_L6 v)                                           
+                            | Ret v =>  L6.instances.certiL5_t0_L6 v
                         end.
 
 Definition comp_to_L6:= fun p =>
-                       comp_L6 (translateTo (cTerm certiL5a) p).
+                       comp_L6 (translateTo (cTerm certiL5) p).
 
 
-Definition testL6 := match comp_L6 color5 with
+Definition testL6 := match comp_L6 fib5 with
                    | Ret ((pr,cenv,nenv), (env, t)) => print_BigStepResult_L6 ((pr,cenv,nenv), (env, t)) 30%nat 
                    | _ =>   L7.L6_to_Clight.print ("Failed during comp_L6")
                    end.
 
-(*Extraction "test_color_eg2.ml" testL6.  *)
+
 
  End TEST_L6.
-
+ Require Import ExtrOcamlBasic.
+Require Import ExtrOcamlString.
+Require Import ExtrOcamlNatInt.
+Extraction "test_fib_eg1.ml" testL6.  
 
 
 
@@ -205,7 +339,7 @@ Definition testL6 := match comp_L6 color5 with
  Definition color7 :=  compile_opt_L7 (comp_L6 color5).  
 
 
- (*
+
 
  Extraction Language Ocaml.
 (* Standard lib -- Comment out if extracting full Compiler using build.sh *)
@@ -215,7 +349,15 @@ Require Import ExtrOcamlNatInt.
 (* Coqlib *)
 Extract Inlined Constant Coqlib.proj_sumbool => "(fun x -> x)".
 
-Extract Constant L7.L6_to_Clight.print => "print_string".
+Extract Constant L7.L6_to_Clight.print  => "
+(fun l -> 
+    let implode l =
+     let result = String.create (List.length l) in
+      let rec imp i = function
+       | [] -> result
+       | c :: l -> result.[i] <- c; imp (i + 1) l in
+      imp 0 l in
+     print_string (implode l))".
 
 Definition print_BigStepResult_L7 (p:cps.M.t Ast.name*Clight.program) (n:nat):=
   L7.L6_to_Clight.print (
@@ -244,7 +386,7 @@ Definition print_BigStepResult_L7 (p:cps.M.t Ast.name*Clight.program) (n:nat):=
 
 (*Definition testBinom := (print_opt_BigStepResult_L7 binom7 10). *)
 (* Definition testVs := (print_opt_BigStepResult_L7 vs7 10).   *)
-Definition testColor := (print_opt_BigStepResult_L7 color7 10).
+Definition testColor := (print_opt_BigStepResult_L7 fib7 100).
 
 (* Extraction "testBinom2_l7.ml" testBinom. *)
 Extraction "testColorT_L7.ml" testColor.  
